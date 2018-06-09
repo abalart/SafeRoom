@@ -1,0 +1,330 @@
+#include <LCD.h>
+#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <SoftwareSerial.h>   // Incluimos la librería  SoftwareSerial para BlueTooth 
+#include <Servo.h>
+#include <DHT.h>
+
+/* const int LedPin = 8 ; */
+
+const int CoolerPin = 10 ; 
+const int BuzzerPin = 2 ; //Es PWM
+const int ServoPin = 9;
+const int LedPin = 12;
+
+const int BlueTooth1 = 7;
+const int BlueTooth2 = 8;
+
+
+#define DHTPIN 5
+#define DHTTYPE DHT22
+Servo myservo;
+int posicion = 0; 
+
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+SoftwareSerial BT(BlueTooth1,BlueTooth2);
+DHT dht(DHTPIN, DHTTYPE);
+
+ float ST_LOW_LIMIT = 30.0;
+ float ST_HIGH_LIMIT = 50.0;
+ float MONOXIDE_LOW_LIMIT = 250.0;
+ float MONOXIDE_HIGH_LIMIT = 300.0;
+
+ int wet=0;
+ int monoxide=0;
+ float temperature=0.0;
+ float st=0.0;
+ int manualSignal=0; 
+
+
+
+/* constantes Servo */
+
+void AbrirServo()
+{
+  myservo.write(0);
+}
+
+void CerrarServo()
+{
+  myservo.write(90);
+}
+
+void activarAlarma() {
+  digitalWrite(BuzzerPin,HIGH);
+}
+
+
+void desactivarAlarma() {
+  digitalWrite(BuzzerPin,LOW);
+}
+
+void prenderLed() {
+  digitalWrite(LedPin,HIGH);
+}
+
+void apagarLed() {
+  digitalWrite(LedPin,LOW);
+}
+
+
+
+/*  contantes buzzer */
+
+#define c 261
+#define d 294
+#define e 329
+#define f 349
+#define g 391
+#define gS 415
+#define a 440
+#define aS 455
+#define b 466
+#define cH 523
+#define cSH 554
+#define dH 587
+#define dSH 622
+#define eH 659
+#define fH 698
+#define fSH 740
+#define gH 784
+#define gSH 830
+#define aH 880
+
+void beep (unsigned char speakerPin, int frequencyInHertz, long timeInMilliseconds)
+{ 
+    //use led to visualize the notes being played
+    
+    int x;    
+    long delayAmount = (long)(1000000/frequencyInHertz);
+    long loopTime = (long)((timeInMilliseconds*1000)/(delayAmount*2));
+    float temperature= getTemperature();
+    int monoxide= getMonoxide();
+    if((temperature <= ST_HIGH_LIMIT) && (monoxide <= MONOXIDE_HIGH_LIMIT))
+          return;
+    for (x=0;x<loopTime;x++){    
+      
+      digitalWrite(speakerPin,HIGH);
+      temperature= getTemperature();
+      monoxide= getMonoxide();
+      if((temperature <= ST_HIGH_LIMIT) && (monoxide <= MONOXIDE_HIGH_LIMIT))
+        return;
+      delayMicroseconds(delayAmount);
+      digitalWrite(speakerPin,LOW);
+      if((temperature <= ST_HIGH_LIMIT) && (monoxide <= MONOXIDE_HIGH_LIMIT))
+            return;
+      delayMicroseconds(delayAmount);
+    }  
+    //delay(20);
+    //a little delay to make all notes sound separate
+}    
+
+void MarchaImperial()
+{
+    beep(BuzzerPin, a, 500); 
+    beep(BuzzerPin, a, 500);     
+    beep(BuzzerPin, a, 500); 
+    beep(BuzzerPin, f, 350); 
+    beep(BuzzerPin, cH, 150);
+    
+    beep(BuzzerPin, a, 500);
+    beep(BuzzerPin, f, 350);
+    beep(BuzzerPin, cH, 150);
+    beep(BuzzerPin, a, 1000);
+    //first bit
+    
+    beep(BuzzerPin, eH, 500);
+    beep(BuzzerPin, eH, 500);
+    beep(BuzzerPin, eH, 500);    
+    beep(BuzzerPin, fH, 350); 
+    beep(BuzzerPin, cH, 150);
+    
+    beep(BuzzerPin, gS, 500);
+    beep(BuzzerPin, f, 350);
+    beep(BuzzerPin, cH, 150);
+    beep(BuzzerPin, a, 1000);
+    //second bit...
+    
+    beep(BuzzerPin, aH, 500);
+    beep(BuzzerPin, a, 350); 
+    beep(BuzzerPin, a, 150);
+    beep(BuzzerPin, aH, 500);
+    beep(BuzzerPin, gSH, 250); 
+    beep(BuzzerPin, gH, 250);
+    
+    beep(BuzzerPin, fSH, 125);
+    beep(BuzzerPin, fH, 125);    
+    beep(BuzzerPin, fSH, 250);
+    
+}
+
+/*  METODOS MONOXIDO */
+ int getMonoxide() 
+ {
+
+    int monoxide;
+    //check here about analog or digital and measures (percent or another).
+    monoxide= analogRead(A0);
+    
+    return monoxide;
+ }
+
+
+/*  METODOS COOLER */
+void EncenderPotenciaMediaCooler()
+{
+  analogWrite (CoolerPin,  128) ;
+}
+
+void EncenderPotenciaMaximaCooler()
+{
+   analogWrite (CoolerPin,  255) ;//n es el ciclo de trabajo
+}
+
+void ApagarCooler()
+{
+    analogWrite (CoolerPin,  0) ;//n es el ciclo de trabajo
+}
+
+/* FIN METODOS COOLER */
+
+
+/*  METODOS TEMPERATURA */
+ float getTemperature() 
+ {
+
+    int temperature;
+    float celciusDegree;
+    
+    //temperature= analogRead(A1);
+    //celciusDegree= (500.0 * temperature)/1023;
+    return dht.readTemperature();
+    //return celciusDegree;
+ }
+/*  METODOS HUMEDAD */
+ float getWet() 
+ {
+  
+   float humedad = dht.readHumidity();
+    return humedad;
+    
+ }
+
+
+/* Display */
+void setupDisplay()
+{
+  lcd.begin(16,2);
+  lcd.print("T:");
+  
+  //lcd.setCursor(11,0);
+  //lcd.print((char)223);
+  //lcd.print("C");
+  lcd.setCursor(8,0);
+  lcd.print("H:");
+
+  lcd.setCursor(0,1);
+  lcd.print("CO:");
+}
+  
+void setup() 
+{
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+
+  pinMode(CoolerPin,  OUTPUT) ; 
+  pinMode(BuzzerPin, OUTPUT);
+  myservo.attach(ServoPin);
+  dht.begin();
+  setupDisplay();
+
+}
+
+void loop() 
+{
+  
+
+  /*if(BT.available())    // Si llega un dato por el puerto BT se envía al monitor serial
+  {
+    manualSignal  = BT.read();
+  }*/
+
+ /*
+  * 
+  if(BT.available())    // Si llega un dato por el puerto BT se envía al monitor serial
+  {
+    Serial.write(BT.read());
+  }
+ 
+  if(Serial.available())  // Si llega un dato por el monitor serial se envía al puerto BT
+  {
+     BT.write(Serial.read());
+  }
+
+  */
+  //si hay alguna señal de la app, guardar en manualSignal
+ 
+  // put your main code here, to run repeatedly:
+  temperature= getTemperature();
+  //valor= digitalRead(9);
+  monoxide= getMonoxide();
+  //float voltaje = limite * (5.0 / 1023.0); //Convertimos la lectura en un valor de voltaje
+  wet= getWet();
+
+if((temperature < ST_LOW_LIMIT) && (monoxide < MONOXIDE_LOW_LIMIT)) //Agrego parentesis entre las 2 condiciones
+{
+  //apagar vetilador,buzzer,led,girar servo a posición de cerrar
+  ApagarCooler();
+  CerrarServo();
+  desactivarAlarma();
+  apagarLed();
+  lcd.setCursor(7,1);
+  lcd.print("OK     ");
+}else if((temperature > ST_HIGH_LIMIT) || (monoxide >MONOXIDE_HIGH_LIMIT)){
+    //prender ventilador(maxima potencia),buzzer,led, girar servo a posición abrir.
+
+    EncenderPotenciaMaximaCooler();
+    //MarchaImperial(); //Hace sonar el tono de peligro
+    activarAlarma();
+    prenderLed();
+    AbrirServo();
+   lcd.setCursor(7,1);
+   lcd.print("PELIGRO");
+   
+ }else {
+      //prender ventilador(media),girar servo a posición abrir.
+      EncenderPotenciaMediaCooler();
+      AbrirServo();
+      desactivarAlarma();
+      apagarLed();
+      lcd.setCursor(7,1);
+      lcd.print("CUIDADO");
+    
+  }
+  
+  lcd.setCursor(2,0);
+  lcd.print(temperature);
+
+  lcd.setCursor(3,1);
+  lcd.print(monoxide);
+
+  lcd.setCursor(10,0);
+  lcd.print(wet);
+
+  //Serial.println(dht.readTemperature());
+  //Serial.println(dht.readHumidity());
+  
+
+  //we need to check here about ST° using temperature and wet.
+  
+  /*if(limite < 90){
+    lcd.setCursor(11,1);
+    lcd.print("OK");
+  }else{
+    lcd.setCursor(11,1);
+    lcd.print("RIESGO");
+  }*/
+
+  delay(1000);          
+}
